@@ -41,5 +41,8 @@ var RouteMap map[string]func(param map[string]interface{}) map[string]interface{
 func init() {
 	RouteMap = map[string]func(param map[string]interface{}) map[string]interface{} {
 		"Index":controller.Index,
+		"PING": func(param map[string]interface{}) map[string]interface{} {
+			return param
+		},
 	}
 }

@@ -61,9 +61,17 @@ func (c *Client) ReadLoop () {
 		}
 
 		var parse msg
-		err = json.Unmarshal(message,&parse)
-		if err != nil {
-			panic(err)
+		if string(message) == "PING" {
+			parse = msg{
+				Method: "PING",
+				Data:   map[string]interface{}{"PONG":"PONG"},
+			}
+		} else {
+
+			err = json.Unmarshal(message,&parse)
+			if err != nil {
+				panic(err)
+			}
 		}
 
 		if _, ok := conf.RouteMap[parse.Method]; !ok {
