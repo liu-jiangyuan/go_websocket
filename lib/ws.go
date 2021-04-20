@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -18,7 +19,6 @@ const (
 	// Maximum message size allowed from peer.
 	maxMessageSize = 512
 )
-var ClientPool []*Client
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -28,17 +28,17 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-
-type Client struct {
+type Info struct {
 	Conn *websocket.Conn
 	Uuid string
 	Uid int64
 }
+
 type msg struct {
 	Method    string `json:"method"`
 	Data      map[string]interface{} `json:"data"`
 }
-func (c *Client) ReadLoop () {
+func (c *Info) ReadLoop () {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("fatal error:%+v",err)
@@ -64,7 +64,7 @@ func (c *Client) ReadLoop () {
 		if string(message) == "PING" {
 			parse = msg{
 				Method: "PING",
-				Data:   map[string]interface{}{"PONG":"PONG"},
+				Data:   map[string]interface{}{"client":c},
 			}
 		} else {
 
@@ -86,11 +86,12 @@ func (c *Client) ReadLoop () {
 		a := res[0].Interface().(map[string]interface{})
 		r , _ := json.Marshal(a)
 		c.Conn.WriteMessage(websocket.TextMessage,r)
+		//Gateway.SendToAll(message)
 		//log.Printf("ReadLoop message:%+v",string(res[0].Interface().([]byte)))
 	}
 }
 
-func (c *Client) tickerLoop ()  {
+func (c *Info) tickerLoop ()  {
 	ticker := time.NewTicker(pingPeriod)
 	for {
 		select {
@@ -108,10 +109,14 @@ func RunServer(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	param := r.URL.Query()
+	if id , err := strconv.ParseInt(param["id"][0],10,64); err == nil {
+		client := &Info{Conn: conn,Uuid:"",Uid:id}
+		Gateway.UidBindClient(id,client)
+		Gateway.ClientBindUid(conn,client)
 
-	client := &Client{Conn: conn,Uuid:"",Uid:0}
-	ClientPool = append(ClientPool,client)
+		go client.tickerLoop()
+		go client.ReadLoop()
+	}
 
-	go client.tickerLoop()
-	go client.ReadLoop()
 }

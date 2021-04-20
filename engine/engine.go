@@ -1,8 +1,9 @@
-package lib
+package engine
 
 import (
 	"github.com/liu-jiangyuan/go_websocket/conf"
 	"github.com/liu-jiangyuan/go_websocket/controller"
+	"github.com/liu-jiangyuan/go_websocket/lib"
 	"log"
 	"net/http"
 )
@@ -29,7 +30,7 @@ func (e *engine) Run() {
 		controller.Test(writer,request)
 	})
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		RunServer(w,r)
+		lib.RunServer(w,r)
 	})
 	log.Printf("server runing on:%+v;\r\n",e.Host+":"+e.Port)
 	err := http.ListenAndServe(e.Host+":"+e.Port, nil)

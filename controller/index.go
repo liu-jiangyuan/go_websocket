@@ -6,7 +6,6 @@ import (
 )
 
 func Index (param map[string]interface{}) map[string]interface{} {
-	log.Printf("%+v",param)
 	return param
 }
 
