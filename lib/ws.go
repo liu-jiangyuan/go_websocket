@@ -40,7 +40,9 @@ type msg struct {
 }
 func (c *Client) ReadLoop () {
 	defer func() {
-		log.Println("fatal error")
+		if err := recover(); err != nil {
+			log.Printf("fatal error:%+v",err)
+		}
 	}()
 	c.Conn.SetReadLimit(maxMessageSize)
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -61,7 +63,7 @@ func (c *Client) ReadLoop () {
 		var parse msg
 		err = json.Unmarshal(message,&parse)
 		if err != nil {
-			log.Fatal(err)
+			panic(err)
 		}
 
 		if _, ok := conf.RouteMap[parse.Method]; !ok {
@@ -80,12 +82,12 @@ func (c *Client) ReadLoop () {
 	}
 }
 
-func (s *Client) tickerLoop ()  {
+func (c *Client) tickerLoop ()  {
 	ticker := time.NewTicker(pingPeriod)
 	for {
 		select {
 		case <-ticker.C:
-			if err := s.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {//心跳检测失败，默认离线
+			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil { //心跳检测失败，默认离线
 				return
 			}
 		}
