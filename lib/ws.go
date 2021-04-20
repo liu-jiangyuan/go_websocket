@@ -39,6 +39,9 @@ type msg struct {
 	Data      map[string]interface{} `json:"data"`
 }
 func (c *Client) ReadLoop () {
+	defer func() {
+		log.Println("fatal error")
+	}()
 	c.Conn.SetReadLimit(maxMessageSize)
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.Conn.SetPongHandler(func(string) error {
