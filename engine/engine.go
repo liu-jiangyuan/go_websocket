@@ -1,29 +1,20 @@
 package engine
 
 import (
-	"github.com/liu-jiangyuan/go_websocket/conf"
+	"github.com/liu-jiangyuan/go_websocket/lib"
 	"log"
 	"net/http"
 )
 
 type Engine struct {
 	Route map[string]func(map[string]interface{}) map[string]interface{}
-	Port string
-	Host string
-}
-
-var routers map[string]func(map[string]interface{}) map[string]interface{}
-
-func init() {
-	routers = make(map[string]func(map[string]interface{})map[string]interface{})
-	routers["PING"] = func(param map[string]interface{}) map[string]interface{} {
-		return param
-	}
+	Port  string
+	Host  string
 }
 
 func InitEngine () *Engine {
 	return &Engine{
-		Route: routers,
+		Route: lib.Route.Ws,
 		Port: "8080",
 		Host: "127.0.0.1",
 	}
@@ -43,27 +34,27 @@ func (e *Engine) GetHost () string {
 }
 
 func (e *Engine) SetHandle (pattern string,action func(writer http.ResponseWriter, request *http.Request)) {
-	http.HandleFunc(pattern,action)
+	lib.Route.Http[pattern] = action
 }
-
 func (e *Engine) AddRoute (path string,callBack func(param map[string]interface{})map[string]interface{}) {
-	routers[path] = callBack
+	lib.Route.Ws[path] = callBack
 }
 
 func GetRoute() map[string]func(map[string]interface{}) map[string]interface{} {
-	return routers
+	return lib.Route.Ws
 }
 
 func (e *Engine) Run() {
 	//InitRoute 配置会覆盖默认
-	wr := conf.InitWsRoute()
+	wr := lib.Route.Ws
 	for pattern , action := range wr {
 		e.AddRoute(pattern,action)
 	}
-	hr := conf.InitHttpRoute()
+	hr := lib.Route.Http
 	for pattern , action := range hr {
-		e.SetHandle(pattern, action)
+		http.HandleFunc(pattern,action)
 	}
+	log.Printf("engine:%+v",e)
 	log.Printf("server runing on:%+v;\r\n",e.Host+":"+e.Port)
 	if err := http.ListenAndServe(e.Host+":"+e.Port, nil);err != nil {
 		log.Fatal("ListenAndServe: ", err)

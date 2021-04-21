@@ -1,8 +1,7 @@
-package ws
+package lib
 
 import (
 	"github.com/gorilla/websocket"
-	"github.com/liu-jiangyuan/go_websocket/lib/msg"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,7 +18,7 @@ const (
 	maxMessageSize = 512
 )
 
-var upgrader = websocket.Upgrader{
+var upgrade = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
@@ -33,10 +32,10 @@ type Info struct {
 	Uid int64
 	mutex sync.Mutex  // 对closeChan关闭上锁
 	isClosed bool  // 防止closeChan被关闭多次
-	Msg *msg.Msg
+	Msg *Msg
 }
 
-func (c *Info) Close() {
+func (c *Info) close() {
 	c.Conn.Close()
 	c.mutex.Lock()
 	if !c.isClosed {
@@ -46,10 +45,10 @@ func (c *Info) Close() {
 	c.mutex.Unlock()
 }
 
-func (c *Info) ReadLoop () {
+func (c *Info) readLoop () {
 	defer func() {
 		if err := recover(); err != nil {
-			c.Close()
+			c.close()
 			log.Printf("fatal error:%+v",err)
 		}
 	}()
@@ -64,7 +63,7 @@ func (c *Info) ReadLoop () {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				c.Close()
+				c.close()
 				break
 			}
 			log.Printf("err:%+v",err)
@@ -84,7 +83,7 @@ func (c *Info) tickerLoop ()  {
 		select {
 		case <-ticker.C:
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil { //心跳检测失败，默认离线
-				c.Close()
+				c.close()
 				return
 			}
 		}
@@ -92,14 +91,14 @@ func (c *Info) tickerLoop ()  {
 }
 
 func RunServer(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := upgrade.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	param := r.URL.Query()
 	if id , err := strconv.ParseInt(param["id"][0],10,64); err == nil {
-		initMsg := msg.InitMsg()
+		initMsg := InitMsg()
 		client := &Info{
 			Conn: conn,
 			Uuid: "",Uid:id,
@@ -107,10 +106,8 @@ func RunServer(w http.ResponseWriter, r *http.Request) {
 		}
 
 		go client.tickerLoop()
-		go client.ReadLoop()
-		go initMsg.ParseMsg(conn)
-		go initMsg.BindMsg()
-		go initMsg.UnBindMsg()
+		go client.readLoop()
+		go initMsg.Parse(conn)
 
 		//登录绑定
 		initMsg.Bind <- [2]interface{}{id,conn}
