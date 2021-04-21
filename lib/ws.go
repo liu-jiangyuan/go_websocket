@@ -2,12 +2,14 @@ package lib
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/liu-jiangyuan/go_websocket/conf"
 	"log"
 	"net/http"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -32,15 +34,30 @@ type Info struct {
 	Conn *websocket.Conn
 	Uuid string
 	Uid int64
+	mutex sync.Mutex  // 对closeChan关闭上锁
+	isClosed bool  // 防止closeChan被关闭多次
 }
-
 type msg struct {
 	Method    string `json:"method"`
 	Data      map[string]interface{} `json:"data"`
 }
+
+
+func (c *Info) Close() {
+	c.Conn.Close()
+	c.mutex.Lock()
+	if !c.isClosed {
+		c.isClosed = true
+	}
+	Gateway.UnbindClient(c.Conn)
+	Gateway.SendToAll([]byte(fmt.Sprintf("%d is closed",c.Uid)))
+	c.mutex.Unlock()
+}
+
 func (c *Info) ReadLoop () {
 	defer func() {
 		if err := recover(); err != nil {
+			c.Close()
 			log.Printf("fatal error:%+v",err)
 		}
 	}()
@@ -55,6 +72,7 @@ func (c *Info) ReadLoop () {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				c.Close()
 				log.Printf("err:%+v",err)
 			}
 			break
@@ -67,7 +85,6 @@ func (c *Info) ReadLoop () {
 				Data:   map[string]interface{}{"client":c},
 			}
 		} else {
-
 			err = json.Unmarshal(message,&parse)
 			if err != nil {
 				panic(err)
@@ -82,21 +99,21 @@ func (c *Info) ReadLoop () {
 		params := make([]reflect.Value,1)  //参数
 		params[0] = reflect.ValueOf(parse.Data)
 		res := fv.Call(params)
-
 		a := res[0].Interface().(map[string]interface{})
+
 		r , _ := json.Marshal(a)
 		c.Conn.WriteMessage(websocket.TextMessage,r)
 		//Gateway.SendToAll(message)
 		//log.Printf("ReadLoop message:%+v",string(res[0].Interface().([]byte)))
 	}
 }
-
 func (c *Info) tickerLoop ()  {
 	ticker := time.NewTicker(pingPeriod)
 	for {
 		select {
 		case <-ticker.C:
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil { //心跳检测失败，默认离线
+				c.Close()
 				return
 			}
 		}
@@ -111,7 +128,10 @@ func RunServer(w http.ResponseWriter, r *http.Request) {
 	}
 	param := r.URL.Query()
 	if id , err := strconv.ParseInt(param["id"][0],10,64); err == nil {
-		client := &Info{Conn: conn,Uuid:"",Uid:id}
+		client := &Info{
+			Conn: conn,
+			Uuid:"",Uid:id,
+		}
 		Gateway.UidBindClient(id,client)
 		Gateway.ClientBindUid(conn,client)
 
