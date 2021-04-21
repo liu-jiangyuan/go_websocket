@@ -1,11 +1,25 @@
 package conf
 
-import "github.com/liu-jiangyuan/go_websocket/controller"
+import (
+	"github.com/liu-jiangyuan/go_websocket/controller"
+	"net/http"
+)
 
 //这个配置只针对websocket
-func InitRoute() map[string]func(map[string]interface{})map[string]interface{} {
+func InitWsRoute() map[string]func(map[string]interface{})map[string]interface{} {
 	return map[string]func(map[string]interface{}) map[string]interface{}{
 		"Index": controller.Index,
+	}
+}
+
+func InitHttpRoute() map[string]func(w http.ResponseWriter, r *http.Request) {
+	return map[string]func(w http.ResponseWriter, r *http.Request){
+		"/":func(w http.ResponseWriter, r *http.Request){
+			w.Write([]byte("hello"))
+		},
+		"/test": func(w http.ResponseWriter, r *http.Request) {
+			controller.Test(w,r)
+		},
 	}
 }
 //type Handler struct {

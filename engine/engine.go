@@ -56,13 +56,16 @@ func GetRoute() map[string]func(map[string]interface{}) map[string]interface{} {
 
 func (e *Engine) Run() {
 	//InitRoute 配置会覆盖默认
-	r := conf.InitRoute()
-	for pattern , action := range r {
+	wr := conf.InitWsRoute()
+	for pattern , action := range wr {
 		e.AddRoute(pattern,action)
 	}
+	hr := conf.InitHttpRoute()
+	for pattern , action := range hr {
+		e.SetHandle(pattern, action)
+	}
 	log.Printf("server runing on:%+v;\r\n",e.Host+":"+e.Port)
-	err := http.ListenAndServe(e.Host+":"+e.Port, nil)
-	if err != nil {
+	if err := http.ListenAndServe(e.Host+":"+e.Port, nil);err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }

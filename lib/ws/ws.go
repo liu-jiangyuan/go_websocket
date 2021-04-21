@@ -1,9 +1,7 @@
 package ws
 
 import (
-	"fmt"
 	"github.com/gorilla/websocket"
-	"github.com/liu-jiangyuan/go_websocket/lib/gateway"
 	"github.com/liu-jiangyuan/go_websocket/lib/msg"
 	"log"
 	"net/http"
@@ -43,8 +41,7 @@ func (c *Info) Close() {
 	c.mutex.Lock()
 	if !c.isClosed {
 		c.isClosed = true
-		gateway.Gateway.UnbindClient(c.Conn)
-		gateway.Gateway.SendToAll([]byte(fmt.Sprintf("%d is closed",c.Uid)))
+		c.Msg.UnBind <- [2]interface{}{c.Uid,c.Conn}
 	}
 	c.mutex.Unlock()
 }
@@ -68,8 +65,9 @@ func (c *Info) ReadLoop () {
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				c.Close()
-				log.Printf("err:%+v",err)
+				break
 			}
+			log.Printf("err:%+v",err)
 			break
 		}
 
@@ -107,12 +105,14 @@ func RunServer(w http.ResponseWriter, r *http.Request) {
 			Uuid: "",Uid:id,
 			Msg:  initMsg,
 		}
-		gateway.Gateway.UidBindClient(id,conn)
-		gateway.Gateway.ClientBindUid(conn,id)
 
 		go client.tickerLoop()
 		go client.ReadLoop()
 		go initMsg.ParseMsg(conn)
-	}
+		go initMsg.BindMsg()
+		go initMsg.UnBindMsg()
 
+		//登录绑定
+		initMsg.Bind <- [2]interface{}{id,conn}
+	}
 }
