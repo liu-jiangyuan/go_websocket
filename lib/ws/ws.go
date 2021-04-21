@@ -1,13 +1,12 @@
-package lib
+package ws
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"github.com/liu-jiangyuan/go_websocket/conf"
+	"github.com/liu-jiangyuan/go_websocket/lib/gateway"
+	"github.com/liu-jiangyuan/go_websocket/lib/msg"
 	"log"
 	"net/http"
-	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -36,21 +35,17 @@ type Info struct {
 	Uid int64
 	mutex sync.Mutex  // 对closeChan关闭上锁
 	isClosed bool  // 防止closeChan被关闭多次
+	Msg *msg.Msg
 }
-type msg struct {
-	Method    string `json:"method"`
-	Data      map[string]interface{} `json:"data"`
-}
-
 
 func (c *Info) Close() {
 	c.Conn.Close()
 	c.mutex.Lock()
 	if !c.isClosed {
 		c.isClosed = true
+		gateway.Gateway.UnbindClient(c.Conn)
+		gateway.Gateway.SendToAll([]byte(fmt.Sprintf("%d is closed",c.Uid)))
 	}
-	Gateway.UnbindClient(c.Conn)
-	Gateway.SendToAll([]byte(fmt.Sprintf("%d is closed",c.Uid)))
 	c.mutex.Unlock()
 }
 
@@ -78,33 +73,11 @@ func (c *Info) ReadLoop () {
 			break
 		}
 
-		var parse msg
-		if string(message) == "PING" {
-			parse = msg{
-				Method: "PING",
-				Data:   map[string]interface{}{"client":c},
-			}
-		} else {
-			err = json.Unmarshal(message,&parse)
-			if err != nil {
-				panic(err)
-			}
-		}
+		//读到的信息全部发送消息中心
+		select {
+		case c.Msg.In <- message:
 
-		if _, ok := conf.RouteMap[parse.Method]; !ok {
-			c.Conn.WriteMessage(websocket.TextMessage,[]byte("method not Exits"))
-			break
 		}
-		fv := reflect.ValueOf(conf.RouteMap[parse.Method])
-		params := make([]reflect.Value,1)  //参数
-		params[0] = reflect.ValueOf(parse.Data)
-		res := fv.Call(params)
-		a := res[0].Interface().(map[string]interface{})
-
-		r , _ := json.Marshal(a)
-		c.Conn.WriteMessage(websocket.TextMessage,r)
-		//Gateway.SendToAll(message)
-		//log.Printf("ReadLoop message:%+v",string(res[0].Interface().([]byte)))
 	}
 }
 func (c *Info) tickerLoop ()  {
@@ -128,15 +101,18 @@ func RunServer(w http.ResponseWriter, r *http.Request) {
 	}
 	param := r.URL.Query()
 	if id , err := strconv.ParseInt(param["id"][0],10,64); err == nil {
+		initMsg := msg.InitMsg()
 		client := &Info{
 			Conn: conn,
-			Uuid:"",Uid:id,
+			Uuid: "",Uid:id,
+			Msg:  initMsg,
 		}
-		Gateway.UidBindClient(id,client)
-		Gateway.ClientBindUid(conn,client)
+		gateway.Gateway.UidBindClient(id,conn)
+		gateway.Gateway.ClientBindUid(conn,id)
 
 		go client.tickerLoop()
 		go client.ReadLoop()
+		go initMsg.ParseMsg(conn)
 	}
 
 }

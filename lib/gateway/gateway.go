@@ -1,12 +1,12 @@
-package lib
+package gateway
 
 import (
 	"github.com/gorilla/websocket"
 )
 
 type gateWay struct {
-	UidBindClientMap map[int64]*Info
-	ClientBindUidMap map[*websocket.Conn]*Info
+	UidBindClientMap map[int64]*websocket.Conn
+	ClientBindUidMap map[*websocket.Conn]int64
 	GroupMap map[string][]int64
 }
 
@@ -14,22 +14,18 @@ var Gateway *gateWay
 
 func init() {
 	Gateway = &gateWay{
-		UidBindClientMap: make(map[int64]*Info),
-		ClientBindUidMap: make(map[*websocket.Conn]*Info),
+		UidBindClientMap: make(map[int64]*websocket.Conn),
+		ClientBindUidMap: make(map[*websocket.Conn]int64),
 		GroupMap:make(map[string][]int64),
 	}
 }
 
-func Asdf(msg []byte) {
-	Gateway.SendToAll(msg)
+func (g *gateWay) UidBindClient (uid int64,conn *websocket.Conn) {
+	g.UidBindClientMap[uid] = conn
 }
 
-func (g *gateWay) UidBindClient (uid int64,client *Info) {
-	g.UidBindClientMap[uid] = client
-}
-
-func (g *gateWay) ClientBindUid (conn *websocket.Conn,client *Info) {
-	g.ClientBindUidMap[conn] = client
+func (g *gateWay) ClientBindUid (conn *websocket.Conn,uid int64) {
+	g.ClientBindUidMap[conn] = uid
 }
 
 func (g *gateWay) UnbindUid (uid int64) {
@@ -49,12 +45,12 @@ func (g *gateWay) LeaveGroup (uid int64,groupName string) {
 }
 
 func (g *gateWay) SendToUid (uid int64,msg []byte) error {
-	return g.UidBindClientMap[uid].Conn.WriteMessage(websocket.TextMessage,msg)
+	return g.UidBindClientMap[uid].WriteMessage(websocket.TextMessage,msg)
 }
 
 func (g *gateWay) SendToGroup (groupName string,msg []byte) {
 	for _, uid := range g.GroupMap[groupName] {
-		g.UidBindClientMap[uid].Conn.WriteMessage(websocket.TextMessage,msg)
+		g.UidBindClientMap[uid].WriteMessage(websocket.TextMessage,msg)
 	}
 }
 

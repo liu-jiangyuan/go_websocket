@@ -1,10 +1,13 @@
 package conf
 
-import (
-	"github.com/liu-jiangyuan/go_websocket/controller"
-)
+import "github.com/liu-jiangyuan/go_websocket/controller"
 
-
+//这个配置只针对websocket
+func InitRoute() map[string]func(map[string]interface{})map[string]interface{} {
+	return map[string]func(map[string]interface{}) map[string]interface{}{
+		"Index": controller.Index,
+	}
+}
 //type Handler struct {
 //	Func  reflect.Value
 //	In   reflect.Type
@@ -35,14 +38,3 @@ import (
 	//inVal := reflect.New(r[c].In).Elem()
 	//rtn := r[c].Func.Call([]reflect.Value{inVal})[0]
 //}
-
-
-var RouteMap map[string]func(param map[string]interface{}) map[string]interface{}
-func init() {
-	RouteMap = map[string]func(param map[string]interface{}) map[string]interface{} {
-		"Index":controller.Index,
-		"PING": func(param map[string]interface{}) map[string]interface{} {
-			return param
-		},
-	}
-}
