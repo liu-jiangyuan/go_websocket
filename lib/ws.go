@@ -15,7 +15,7 @@ const (
 	// Send pings to peer with this period. Must be less than pongWait.
 	pingPeriod = (pongWait * 9) / 10
 	// Maximum message size allowed from peer.
-	maxMessageSize = 512
+	maxMessageSize = 1024
 )
 
 var upgrade = websocket.Upgrader{
@@ -49,7 +49,7 @@ func (c *Info) readLoop () {
 	defer func() {
 		if err := recover(); err != nil {
 			c.close()
-			log.Printf("fatal error:%+v",err)
+			//log.Printf("fatal error:%+v",err)
 		}
 	}()
 	c.Conn.SetReadLimit(maxMessageSize)
@@ -66,8 +66,7 @@ func (c *Info) readLoop () {
 				c.close()
 				break
 			}
-			log.Printf("err:%+v",err)
-			break
+			panic(err)
 		}
 
 		//读到的信息全部发送消息中心
@@ -78,6 +77,11 @@ func (c *Info) readLoop () {
 	}
 }
 func (c *Info) tickerLoop ()  {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("fatal error:%+v",err)
+		}
+	}()
 	ticker := time.NewTicker(pingPeriod)
 	for {
 		select {
@@ -110,6 +114,10 @@ func RunServer(w http.ResponseWriter, r *http.Request) {
 		go initMsg.Parse(conn)
 
 		//登录绑定
-		initMsg.Bind <- [2]interface{}{id,conn}
+		//initMsg.Bind <- [2]interface{}{id,conn}
+		//Timer.After(time.Millisecond * 1, func(args ...map[string]interface{}) map[string]interface{} {
+		//	gateway.Gateway.SendToUid(id,[]byte("heart..."))
+		//	return nil
+		//})
 	}
 }

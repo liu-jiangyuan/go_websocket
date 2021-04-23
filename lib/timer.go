@@ -1,8 +1,6 @@
 package lib
 
 import (
-	"github.com/liu-jiangyuan/go_websocket/controller"
-	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -31,6 +29,11 @@ func init() {
 		timerMap: make(map[int64]timerStruct),
 	}
 	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+
+			}
+		}()
 		for {
 			select {
 			case id := <- Timer.stopChan:
@@ -69,8 +72,9 @@ func (t *timer) ClearAll() {
 //必须执行一次的定时器，无法销毁
 func (t *timer) MustOnceAfter (second time.Duration,action func(args ...map[string]interface{}) map[string]interface{} ) {
 	time.AfterFunc(second, func() {
-		res := action()
-		log.Printf("MustOnceAfter:%+v",res)
+		action()
+		//res := action()
+		//log.Printf("MustOnceAfter:%+v",res)
 	})
 }
 
@@ -81,8 +85,9 @@ func (t *timer) After (second time.Duration,action func(args ...map[string]inter
 	t.timerMap[timerId] = timerStruct{
 		d:      second,
 		t:      time.AfterFunc(second, func() {
-			res := action()
-			log.Printf("After:%+v",res)
+			action()
+			//res := action()
+			//log.Printf("After:%+v",res)
 		}),
 		action: nil,
 	}
@@ -119,43 +124,12 @@ func (t *timer) Loop (second time.Duration,action func(args ...map[string]interf
 				restTimes ++
 				t.timerMap[id].t.Reset(s.d)
 				//s.Action(s.Args)
-				res := action()
-				log.Printf("Loop:%+v",res)
+				action()
+				//res := action()
+				//log.Printf("Loop:%+v",res)
 			}
 		}
 	}(timerId,t.timerMap[timerId])
 
 	return timerId
-}
-
-
-func Call (args ...map[string]interface{}) map[string]interface{} {
-	log.Printf("-------------- Call args:%+v --------------------",args)
-	r := map[string]interface{}{"A":"B"}
-	if len(args) > 0 {
-		r = args[0]
-	}
-	return r
-}
-
-func test() {
-	id := Timer.After(time.Second * 7 , Call)
-	log.Printf("Timer After id:%+v",id)
-
-	id2 := Timer.After(time.Second * 3 , Call)
-	log.Printf("Timer Tick id:%+v",id2)
-
-	id3 := Timer.Loop (time.Second * 1 , func(args ...map[string]interface{}) map[string]interface{} {
-		return Call(map[string]interface{}{"method":"loop-call","test1":1})
-	},1,5)
-	log.Printf("Timer Tick id:%+v",id3)
-
-	Timer.MustOnceAfter(time.Second * 5 , func(args ...map[string]interface{}) map[string]interface{} {
-		return Call(controller.Index(map[string]interface{}{"method":"MustOnceAfter"}))
-	})
-
-	time.AfterFunc(3 * time.Second, func() {
-		Timer.Clear(id3)
-	})
-	Timer.Clear(id)
 }

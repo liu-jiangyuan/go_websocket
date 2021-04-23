@@ -43,6 +43,11 @@ func InitMsg() *Msg {
 }
 
 func (m *Msg) Parse(conn *websocket.Conn) {
+	defer func() {
+		if err := recover(); err != nil {
+			//log.Printf("fatal error:%+v",err)
+		}
+	}()
 	var (
 		in []byte
 		bind [2]interface{}
@@ -58,7 +63,6 @@ func (m *Msg) Parse(conn *websocket.Conn) {
 			break
 		case unbind = <- m.UnBind:
 			m.unBind(unbind)
-
 		}
 	}
 }

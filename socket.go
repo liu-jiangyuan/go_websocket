@@ -8,6 +8,11 @@ import (
 
 func main()  {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("err:%+v",err)
+		}
+	}()
 	e := engine.InitEngine()
 	conf.InitRoute()
 	e.SetHost("0.0.0.0")
